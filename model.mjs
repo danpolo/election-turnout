@@ -85,7 +85,7 @@ export function turnoutAudit(cities,snapshot,modeled=null){
     const g=stronghold?arabStronghold:others;
     g.localities++;g.eligible+=nowEligible;g.liveCast+=cast;g.previousCast+=prev*nowEligible/eligible;seen++;
     const clock=String(live.observationTime||'');
-    if(/^([01]\\d|2[0-3]):[0-5]\\d$/.test(clock)){
+    if(/^([01]\d|2[0-3]):[0-5]\d$/.test(clock)){
       const minutes=Number(clock.slice(0,2))*60+Number(clock.slice(3,5));
       if(minutes<=localMinutes)cityObservations.push({minutes,eligible:nowEligible});
     }
