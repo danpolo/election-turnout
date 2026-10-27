@@ -1,0 +1,38 @@
+name: Smoke test published election dashboard
+on:
+  push:
+    paths:
+      - '.github/workflows/verify-site.yml'
+      - 'index.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-public-pages:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check public GitHub Pages URL and deployed assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://danpolo.github.io/election-turnout/'
+          for path in '' 'index.html' 'app.mjs' 'model.mjs' 'live-mirror.mjs' 'data/turnout.json'; do
+            url="$base$path"
+            echo "Checking $url"
+            code=$(curl -L -sS --max-time 25 --retry 3 --retry-delay 2 \
+              -w '%{http_code}' -o /tmp/election-smoke-body "$url")
+            echo "HTTP $code, $(wc -c </tmp/election-smoke-body) bytes"
+            if [[ "$code" != 200 ]]; then
+              echo 'Response body excerpt:'
+              head -c 600 /tmp/election-smoke-body || true
+              exit 1
+            fi
+            if [[ "$path" == '' || "$path" == 'index.html' ]]; then
+              grep -q 'מפת המנדטים' /tmp/election-smoke-body || { echo 'Wrong HTML served'; exit 1; }
+            fi
+            if [[ "$path" == 'data/turnout.json' ]]; then
+              python3 -c 'import json; j=json.load(open("/tmp/election-smoke-body")); assert j["type"]=="turnout"; assert len(j["localities"])>100; print("Data timestamp",j["timestamp"])'
+            fi
+          done
+          echo 'PASS: Public deployment and five app/data resources verified.'
