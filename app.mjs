@@ -1,4 +1,5 @@
 import {modelHistoric,modelCount,scenario,coalitions} from './model.mjs';
+import {MIRROR_URL,mirrorToTurnoutSnapshot} from './live-mirror.mjs';
 const $=id=>document.getElementById(id);
 const url2022='https://raw.githubusercontent.com/NitzanSelwyn/Voters-IL/main/public/data/rounds/25.json';
 let cities=[],turnout=null,count=null,selected='turnout',oOverride=null,loading=false;
@@ -40,7 +41,7 @@ function render(){
   $('turnout-mode').style.outline=selected==='turnout'?'2px solid #80adff':'none';
   $('count-mode').style.outline=selected==='count'?'2px solid #80adff':'none';
   $('compare').innerHTML=`<p>${showForecast('השתתפות',t)}</p><p>${showForecast('ספירה',c)}</p>`;
-  if(!current.ok){$('basis').textContent=current.reason||'';$('total').textContent='אין נתונים';for(const id of ['rNum','lNum','aNum'])$(id).textContent='—';$('bar').innerHTML='';$('coalitions').innerHTML='<tr><td colspan="2">ממתינים לנתונים תקינים</td></tr>';$('legend').innerHTML='';$('oOut').textContent=oOverride==null?'מחושב אוטומטית':String(oOverride);return;}
+  if(!current.ok){$('feed-source').style.display='none';$('basis').textContent=current.reason||'';$('total').textContent='אין נתונים';for(const id of ['rNum','lNum','aNum'])$(id).textContent='—';$('bar').innerHTML='';$('coalitions').innerHTML='<tr><td colspan="2">ממתינים לנתונים תקינים</td></tr>';$('legend').innerHTML='';$('oOut').textContent=oOverride==null?'מחושב אוטומטית':String(oOverride);return;}
   const s=scenario(current,{yamcha:+$('y').value,miluim:+$('m').value,otzmaOverride:oOverride,countMode:selected==='count'});
   const total=s.right+s.left+s.arab+s.m+s.y;
   $('total').textContent=`${total} / 120`;
@@ -51,7 +52,10 @@ function render(){
   $('legend').innerHTML=colored('עוצמה יהודית',s.o,'#508cdb')+colored('רע״ם',s.ra,'#32c6a0')+colored('ש״ס + יהדות התורה',s.h,'#90a0bd')+colored('הדמוקרטים',s.d,'#f595a1');
   $('coalitions').innerHTML=coalitions(s).map(x=>`<tr><td>${x.label}</td><td><b class="${x.possible?'yes':'no'}">${x.seats}</b><span class="muted small"> (${x.margin>=0?'+':''}${x.margin})</span></td></tr>`).join('');
   const snapshot=selected==='count'?count:turnout;
-  $('basis').textContent=`${selected==='count'?'ספירת קולות':'אחוזי הצבעה'} · ${current.matched}/${current.total} יישובים · עדכון המקור: ${new Date(snapshot.timestamp).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'})} · נתונים אינם מדגם אקראי.`;
+  const mirror=snapshot.sourceKind==='third-party-republication';
+  const reporting=mirror?` · שיעור השתתפות ארצי לפי המקור: ${snapshot.nationalTurnoutPct??'—'}% · דיווחי קלפיות עד ${snapshot.observationAsOf||'שעה לא ידועה'}`:'';
+  $('basis').textContent=`${selected==='count'?'ספירת קולות':'אחוזי הצבעה'} · ${current.matched}/${current.total} יישובים · עדכון הקובץ: ${new Date(snapshot.timestamp).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'})}${reporting} · ${mirror?'מקור צד שלישי; נתוני אחוזי ההצבעה ביישוב מבוססים על קלפיות מדווחות בלבד ומומרים לבסיס בעלי זכות בחירה של 2022, ולא לספירת מצביעים מאומתת ב־2026.':'מקור ממשלתי או מקור שהוגדר ידנית.'} · אינו מדגם אקראי.`;
+  $('feed-source').style.display=mirror?'inline':'none';
 }
 async function refresh(){
   if(loading)return;loading=true;$('refresh').disabled=true;
@@ -75,6 +79,16 @@ async function refresh(){
           if(type==='turnout')turnout=d;else count=d;
         }
       } catch(e) { errors.push(`${type}: ${e.message}`); }
+    }
+    // If the direct official feed is not published, use the public live mirror.
+    // This fallback is always marked as third-party republication in the UI.
+    if(!own('turnout-url')&&(!turnout||turnout.sourceKind==='third-party-republication')){
+      try {
+        const raw=await fetchJSON(MIRROR_URL+'?ts='+Date.now());
+        const fromMirror=validSnapshot(mirrorToTurnoutSnapshot(raw,cities),'turnout');
+        if(!turnout||Date.parse(fromMirror.timestamp)>=Date.parse(turnout.timestamp))turnout=fromMirror;
+        errors=errors.filter(x=>!x.startsWith('turnout:'));
+      } catch(e) {if(!turnout)errors.push('מראה נתונים: '+e.message);}
     }
     const loaded=[turnout&&'השתתפות',count&&'ספירה'].filter(Boolean);
     if(loaded.length){
@@ -100,3 +114,5 @@ $('upload').addEventListener('change',async e=>{
 });
 if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
 refresh();
+// Re-fetch on a visible tab every two minutes; user can always press Refresh now.
+setInterval(()=>{if(!document.hidden)refresh()},2*60*1000);

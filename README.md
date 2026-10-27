@@ -2,6 +2,14 @@
 
 Installable, dependency-free Hebrew RTL PWA for exploratory 2026 Israel election **turnout and count scenarios**, with six arithmetic coalition combinations. **Not an official result, poll, or statistically validated forecast.**
 
+## Working election-day turnout fallback (27 October 2026)
+
+When no validated same-origin official snapshot exists, **Refresh now** fetches `https://raw.githubusercontent.com/navonyaniv/election-il-2026/main/results.json` (independently operated repository [election-il-2026](https://github.com/navonyaniv/election-il-2026)). This repository publicly republishes timestamped Central Elections Committee **partial polling-station turnout** as `live_towns[localityCode] = [percent, reportingStationCount, timestamp]`. At the time of integration the snapshot included 555 localities and a reported 31.5% national turnout, with file updated 13:14 Israel time. These numbers are dated observations, **not live claims** unless refreshed.
+
+The browser validates an election-day `updated` timestamp, no rehearsal flag, an acceptable stage, and at least 100 matching locality reports. It uses each locality's **2022 registered electorate as a historical synthetic denominator**, applying the percentage from reporting 2026 polling stations. This allows bloc mixing without pretending 2026 electorate counts are known. This conversion is a heuristic and reporting stations are **not a random sample** of each locality. The app labels this fallback and shows a source link; the source is not the CEC's own API. If both the verified official same-origin turnout JSON and the mirror exist, the official file has priority. The displayed turnout model is a model of historical bloc composition weighted by reported turnout, **not a current-vote measurement or statistically validated forecast**.
+
+Both the manual Refresh button and a 2-minute visible-tab auto-refresh attempt a new fetch; published mirror snapshots may be older than the polling-station observation times. The repo's `.github/workflows/live.yml` separately tries to ingest data directly from CEC production hosts without trusting unverified endpoints and only writes validated snapshots.
+
 ## Live data wiring
 
 The PWA now automatically requests two **same-origin**, versioned data files:
