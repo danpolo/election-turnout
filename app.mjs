@@ -60,7 +60,16 @@ function render(){
   $('mOut').textContent=$('m').value;$('yOut').textContent=$('y').value;
   const t=cities.length?modelHistoric(cities,turnout):{ok:false,reason:'היסטוריה עדיין לא נטענה'};
   const c=cities.length?modelCount(cities,count):{ok:false,reason:'היסטוריה עדיין לא נטענה'};
-  $('turnout-audit').innerHTML=cities.length&&turnout?turnoutAuditContent(turnoutAudit(cities,turnout,t)):'ממתינים לנתוני הצבעה.';
+  const turnoutDiagnostics=cities.length&&turnout?turnoutAudit(cities,turnout,t):{ok:false};
+  $('turnout-audit').innerHTML=turnoutAuditContent(turnoutDiagnostics);
+  const staleShare=turnoutDiagnostics.localitiesOver60MinOldPct;
+  const showStale=turnout?.sourceKind==='third-party-republication'&&staleShare!=null&&staleShare>=30;
+  $('freshness-warning').style.display=showStale?'block':'none';
+  if(showStale)$('freshness-warning').textContent=
+    'אזהרת עדכניות: ביישובים שמייצגים '+staleShare.toFixed(0)+'% מבעלי זכות הבחירה המדווחים, נתון ההשתתפות ישן ביותר משעה מזמן עדכון קובץ המקור. התחזית מבוססת על דיווחי יישובים ישנים למרות שעדכון הארצי עשוי להיות חדש.';
+  if(selected==='turnout'&&turnout?.sourceKind==='third-party-republication'&&turnoutDiagnostics.ok){
+    $('stamp').textContent='יישובים (שעה חציונית): '+(turnoutDiagnostics.weightedMedianLocalityTime||'לא ידועה')+' · קובץ: '+new Date(turnout.timestamp).toLocaleTimeString('he-IL',{timeZone:'Asia/Jerusalem'});
+  }
   const current=selected==='count'?c:t;
   $('turnout-mode').style.outline=selected==='turnout'?'2px solid #80adff':'none';
   $('count-mode').style.outline=selected==='count'?'2px solid #80adff':'none';
