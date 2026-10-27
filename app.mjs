@@ -79,6 +79,19 @@ async function refresh(){
           if(type==='turnout')turnout=d;else count=d;
         }
       } catch(e) { errors.push(`${type}: ${e.message}`); }
+      // GitHub Actions commits with GITHUB_TOKEN may not trigger GitHub Pages
+      // rebuilds. Read current main-branch JSON as well, avoiding stale Pages.
+      if(!userUrl){
+        try{
+          const rawUrl=`https://raw.githubusercontent.com/danpolo/election-turnout/main/data/${type}.json?ts=${Date.now()}`;
+          const fresh=validSnapshot(await fetchJSON(rawUrl),type);
+          const previous=type==='turnout'?turnout:count;
+          if(!previous||Date.parse(fresh.timestamp)>Date.parse(previous.timestamp)){
+            if(type==='turnout')turnout=fresh;else count=fresh;
+          }
+          errors=errors.filter(x=>!x.startsWith(`${type}:`));
+        }catch(e){ /* Keep valid Pages or previous data; raw file may not yet exist. */ }
+      }
     }
     // If the direct official feed is not published, use the public live mirror.
     // This fallback is always marked as third-party republication in the UI.
