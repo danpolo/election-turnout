@@ -1,0 +1,31 @@
+name: Update election-day snapshots
+on:
+  schedule:
+    # GH Actions schedules are approximate and can be delayed at peak load.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: election-live-data
+  cancel-in-progress: false
+jobs:
+  poll:
+    if: github.repository == 'danpolo/election-turnout'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch official 2026 snapshots
+        env:
+          TURNOUT_FEED_URL: ${{ vars.TURNOUT_FEED_URL }}
+        run: python scripts/update_live.py
+      - name: Commit only changed data files
+        run: |
+          git add data/turnout.json data/count.json 2>/dev/null || true
+          if git diff --cached --quiet; then echo 'No verified changes'; exit 0; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'data: update verified CEC election snapshot'
+          git push
