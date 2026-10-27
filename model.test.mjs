@@ -24,9 +24,9 @@ test('turnout audit explains Arab proportional baseline and relative turnout wit
   {cityCode:'101',eligibleVoters:1000,totalVotes:500,validVotes:500,parties:{'עם':400,'מחל':60,'פה':40}},
   {cityCode:'202',eligibleVoters:1000,totalVotes:800,validVotes:800,parties:{'עם':20,'מחל':480,'פה':300}}
  ];
- const live={nationalTurnoutPct:50,localities:[
-  {code:'101',eligible:1000,voters:600},
-  {code:'202',eligible:1000,voters:400}
+ const live={timestamp:'2026-10-27T18:40:00+02:00',nationalTurnoutPct:50,localities:[
+  {code:'101',eligible:1000,voters:600,observationTime:'18:00'},
+  {code:'202',eligible:1000,voters:400,observationTime:'17:00'}
  ]};
  const t=turnoutAudit(cities,live);
  assert.equal(t.ok,true);
@@ -39,6 +39,8 @@ test('turnout audit explains Arab proportional baseline and relative turnout wit
  assert.equal(t.baselineArabSeats,39);
  assert.equal(t.adjustedArabSeats,59);
  assert.equal(t.turnoutGapPp,0);
+ assert.equal(t.weightedMedianLocalityTime,'17:00');
+ assert.equal(t.localitiesOver60MinOldPct,50);
 });
 test('turnout audit fails closed without an observed locality',()=>{
  assert.equal(turnoutAudit([],{localities:[]}).ok,false);

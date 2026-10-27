@@ -67,6 +67,9 @@ export function turnoutAudit(cities,snapshot,modeled=null){
   const byCode=new Map(snapshot.localities.map(x=>[String(x.code??x.cityCode),x]));
   const group=()=>({localities:0,eligible:0,liveCast:0,previousCast:0});
   const arabStronghold=group(),others=group();
+  const localTime=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Jerusalem',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(snapshot.timestamp||Date.now()));
+  const localMinutes=Number(localTime.slice(0,2))*60+Number(localTime.slice(3));
+  const cityObservations=[];
   const past={right:0,left:0,arab:0};
   let seen=0;
   for(const c of cities){
@@ -81,6 +84,11 @@ export function turnoutAudit(cities,snapshot,modeled=null){
     const stronghold=sum(c.parties,HISTORIC_2022.arab)/valid>=0.5;
     const g=stronghold?arabStronghold:others;
     g.localities++;g.eligible+=nowEligible;g.liveCast+=cast;g.previousCast+=prev*nowEligible/eligible;seen++;
+    const clock=String(live.observationTime||'');
+    if(/^([01]\\d|2[0-3]):[0-5]\\d$/.test(clock)){
+      const minutes=Number(clock.slice(0,2))*60+Number(clock.slice(3,5));
+      if(minutes<=localMinutes)cityObservations.push({minutes,eligible:nowEligible});
+    }
   }
   if(!seen)return {ok:false};
   const mean=g=>({
@@ -89,6 +97,17 @@ export function turnoutAudit(cities,snapshot,modeled=null){
     turnout2022FinalPct:g.eligible?100*g.previousCast/g.eligible:null,
     paceVs2022Final:g.previousCast?g.liveCast/g.previousCast:null
   });
+  const observedEligible=cityObservations.reduce((a,x)=>a+x.eligible,0);
+  const staleEligible=cityObservations.filter(x=>localMinutes-x.minutes>60).reduce((a,x)=>a+x.eligible,0);
+  cityObservations.sort((a,b)=>a.minutes-b.minutes);
+  let runningEligible=0,medianMinute=null;
+  for(const x of cityObservations){
+    runningEligible+=x.eligible;
+    if(runningEligible>=observedEligible/2){medianMinute=x.minutes;break;}
+  }
+  const fmtMinute=n=>n==null?null:String(Math.floor(n/60)).padStart(2,'0')+':'+String(n%60).padStart(2,'0');
+  const medianLocalityTime=fmtMinute(medianMinute);
+  const staleEligibleSharePct=observedEligible?100*staleEligible/observedEligible:null;
   const raw=modeled?.ok?modeled:modelHistoric(cities,snapshot);
   if(!raw.ok)return {ok:false};
   const baseline=largestRemainder(past,120);
@@ -104,7 +123,9 @@ export function turnoutAudit(cities,snapshot,modeled=null){
     matchedLocalities:seen,
     observedLocalityTurnoutPct:observedPct,
     sourceNationalTurnoutPct:officialPct,
-    turnoutGapPp:officialPct!=null&&observedPct!=null?officialPct-observedPct:null
+    turnoutGapPp:officialPct!=null&&observedPct!=null?officialPct-observedPct:null,
+    weightedMedianLocalityTime:medianLocalityTime,
+    localitiesOver60MinOldPct:staleEligibleSharePct
   };
 }
 

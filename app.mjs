@@ -39,6 +39,11 @@ function turnoutAuditContent(data){
   const fmt=(n,d=1)=>n==null?'—':n.toLocaleString('he-IL',{maximumFractionDigits:d,minimumFractionDigits:d});
   const st=data.strongholds,other=data.otherLocalities;
   const gap=data.turnoutGapPp;
+  const staleness=data.localitiesOver60MinOldPct;
+  const freshness=data.weightedMedianLocalityTime
+    ?' שעת התצפית החציונית המשוקללת לפי גודל פנקס 2022 היא '+data.weightedMedianLocalityTime
+      +'; ביישובים המייצגים '+fmt(staleness)+'% מבעלי זכות הבחירה המדווחים, התצפית מפגרת ביותר משעה אחרי זמן עדכון הקובץ.'
+    :' לא זמין תיעוד תקין של שעות הדיווח לפי יישוב.';
   const warning=gap==null?'אין נתון ארצי להשוואה.':Math.abs(gap)>=3
     ?'פער משמעותי: דיווחי הקלפיות לכל יישוב אינם בהכרח מייצגים את כל הקלפיות בו; גם שעת העדכון אינה בהכרח זהה לשעת הדיווח הארצי. אין להשתמש בהפרש כבסיס לתיקון מספרי שרירותי.'
     :'אחוזי ההצבעה ביישובים עשויים לייצג קלפיות מדווחות בלבד, והעדכונים אינם בהכרח מאותה שעה.';
@@ -48,7 +53,7 @@ function turnoutAuditContent(data){
     <tr><td>שאר היישובים (${other.localities})</td><td>${fmt(other.turnout2026Pct)}%</td><td>${fmt(other.turnout2022FinalPct)}%</td><td>${fmt(other.paceVs2022Final,2)}×</td></tr>
     </tbody></table>
     <p class="muted small">״מעוז״ מוגדר כאן באופן טכני: לפחות 50% מהקולות הכשרים ב־2022 ניתנו לרע״ם, חד״ש־תע״ל או בל״ד; זה אינו מיון אוכלוסייה לפי מוצא. אחוז 2026 מבוסס על הנתונים שדווחו במקור, ושיעור 2022 הוא של סוף יום הבחירות, לא אותה שעה.</p>
-    <p><b>בדיקת כיסוי ומקור:</b> שיעור ההשתתפות המשוקלל לפי פנקס בעלי זכות הבחירה של 2022 מתוך היישובים המדווחים הוא ${fmt(data.observedLocalityTurnoutPct)}%, מול ${fmt(data.sourceNationalTurnoutPct)}% בדיווח הארצי של המקור${gap!=null?` (פער ${fmt(gap)} נקודות אחוז)`:''}. <b>${warning}</b></p>`;
+    <p><b>בדיקת כיסוי ומקור:</b> שיעור ההשתתפות המשוקלל לפי פנקס בעלי זכות הבחירה של 2022 מתוך היישובים המדווחים הוא ${fmt(data.observedLocalityTurnoutPct)}%, מול ${fmt(data.sourceNationalTurnoutPct)}% בדיווח הארצי של המקור${gap!=null?` (פער ${fmt(gap)} נקודות אחוז)`:''}. <b>${warning}</b></p><p class="muted small"><b>עדכניות הדיווחים לפי יישוב:</b>${freshness} עדכון הקובץ אינו בהכרח עדכון התצפיות עצמן.</p>`;
 }
 
 function render(){
