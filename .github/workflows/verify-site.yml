@@ -10,7 +10,7 @@ permissions:
 jobs:
   verify-public-pages:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 6
     steps:
       - name: Check public GitHub Pages URL and deployed assets
         shell: bash
@@ -36,3 +36,28 @@ jobs:
             fi
           done
           echo 'PASS: Public deployment and five app/data resources verified.'
+
+      - name: Render dashboard in headless Chrome and verify live calculations
+        shell: bash
+        run: |
+          set -euo pipefail
+          chrome=$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)
+          test -n "$chrome" || { echo "Headless Chrome not installed on runner"; exit 1; }
+          echo "Browser: $chrome"
+          timeout 100s "$chrome" --headless --no-sandbox --disable-gpu \
+            --disable-dev-shm-usage --virtual-time-budget=40000 --dump-dom \
+            'https://danpolo.github.io/election-turnout/' \
+            > /tmp/election-rendered.html 2> /tmp/election-chrome-stderr || {
+              tail -30 /tmp/election-chrome-stderr; exit 1;
+            }
+          python3 - <<'PY'
+          import re, pathlib, html
+          d=pathlib.Path('/tmp/election-rendered.html').read_text()
+          for label, identifier in [('total','total'),('source','source-state'),('status','status'),('basis','basis')]:
+              match=re.search(r'<[^>]+id="'+identifier+r'"[^>]*>(.*?)</',d,re.S)
+              print(label+':', html.unescape(re.sub(r'<[^>]+>','',match.group(1) if match else '<missing>'))[:500])
+          match=re.search(r'id="total"[^>]*>\s*120\s*/\s*120\s*<',d)
+          assert match, "Dashboard did not render a complete 120-seat allocation"
+          assert '2022:' in d, "Historical data never loaded"
+          print('PASS: Headless browser executed app modules and rendered 120 mandates')
+          PY
