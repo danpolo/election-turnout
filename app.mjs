@@ -1,4 +1,4 @@
-import {modelHistoric,modelCount,scenario,coalitions} from './model.mjs';
+import {modelHistoric,modelCount,scenario,coalitions,turnoutAudit} from './model.mjs';
 import {MIRROR_URL,mirrorToTurnoutSnapshot} from './live-mirror.mjs';
 const $=id=>document.getElementById(id);
 const url2022='https://raw.githubusercontent.com/NitzanSelwyn/Voters-IL/main/public/data/rounds/25.json';
@@ -33,10 +33,29 @@ function showForecast(name,raw){
   const s=scenario(raw,{yamcha:+$('y').value,miluim:+$('m').value,otzmaOverride:oOverride,countMode:name==='ספירה'});
   return `<strong>${name}:</strong> ימין ${s.right}, שמאל ${s.left}, ערבים ${s.arab} (כיסוי: ${raw.matched}/${raw.total} יישובים)`;
 }
+
+function turnoutAuditContent(data){
+  if(!data.ok)return 'אין עדיין נתוני יישובים שמאפשרים ניתוח של המודל.';
+  const fmt=(n,d=1)=>n==null?'—':n.toLocaleString('he-IL',{maximumFractionDigits:d,minimumFractionDigits:d});
+  const st=data.strongholds,other=data.otherLocalities;
+  const gap=data.turnoutGapPp;
+  const warning=gap==null?'אין נתון ארצי להשוואה.':Math.abs(gap)>=3
+    ?'פער משמעותי: דיווחי הקלפיות לכל יישוב אינם בהכרח מייצגים את כל הקלפיות בו; גם שעת העדכון אינה בהכרח זהה לשעת הדיווח הארצי. אין להשתמש בהפרש כבסיס לתיקון מספרי שרירותי.'
+    :'אחוזי ההצבעה ביישובים עשויים לייצג קלפיות מדווחות בלבד, והעדכונים אינם בהכרח מאותה שעה.';
+  return `<p><b>מהיכן מגיע המספר?</b> בקולות המפלגות הערביות שנרשמו ביישובים ב־2022 היו ${fmt(data.pastArabVotes,0)} קולות, מתוך ${fmt(data.pastClassifiedVotes,0)} קולות ששויכו לאחד משלושת הגושים. חלוקה יחסית ל־120 (בלי סף חסימה או עודפי קולות) נותנת ${data.baselineArabSeats} מנדטים; משקלי ההשתתפות הנוכחיים נותנים ${data.adjustedArabSeats}. אלה תוצרי המודל בלבד, לא אומדן מאומת לתוצאות הבחירות.</p>
+    <table><thead><tr><th>קבוצת יישובים</th><th>השתתפות 2026 שדווחה</th><th>השתתפות סופית 2022</th><th>יחס לקולות 2022</th></tr></thead><tbody>
+    <tr><td>מעוזי המפלגות הערביות (${st.localities})</td><td>${fmt(st.turnout2026Pct)}%</td><td>${fmt(st.turnout2022FinalPct)}%</td><td>${fmt(st.paceVs2022Final,2)}×</td></tr>
+    <tr><td>שאר היישובים (${other.localities})</td><td>${fmt(other.turnout2026Pct)}%</td><td>${fmt(other.turnout2022FinalPct)}%</td><td>${fmt(other.paceVs2022Final,2)}×</td></tr>
+    </tbody></table>
+    <p class="muted small">״מעוז״ מוגדר כאן באופן טכני: לפחות 50% מהקולות הכשרים ב־2022 ניתנו לרע״ם, חד״ש־תע״ל או בל״ד; זה אינו מיון אוכלוסייה לפי מוצא. אחוז 2026 מבוסס על הנתונים שדווחו במקור, ושיעור 2022 הוא של סוף יום הבחירות, לא אותה שעה.</p>
+    <p><b>בדיקת כיסוי ומקור:</b> שיעור ההשתתפות המשוקלל לפי פנקס בעלי זכות הבחירה של 2022 מתוך היישובים המדווחים הוא ${fmt(data.observedLocalityTurnoutPct)}%, מול ${fmt(data.sourceNationalTurnoutPct)}% בדיווח הארצי של המקור${gap!=null?` (פער ${fmt(gap)} נקודות אחוז)`:''}. <b>${warning}</b></p>`;
+}
+
 function render(){
   $('mOut').textContent=$('m').value;$('yOut').textContent=$('y').value;
   const t=cities.length?modelHistoric(cities,turnout):{ok:false,reason:'היסטוריה עדיין לא נטענה'};
   const c=cities.length?modelCount(cities,count):{ok:false,reason:'היסטוריה עדיין לא נטענה'};
+  $('turnout-audit').innerHTML=cities.length&&turnout?turnoutAuditContent(turnoutAudit(cities,turnout,t)):'ממתינים לנתוני הצבעה.';
   const current=selected==='count'?c:t;
   $('turnout-mode').style.outline=selected==='turnout'?'2px solid #80adff':'none';
   $('count-mode').style.outline=selected==='count'?'2px solid #80adff':'none';
@@ -53,7 +72,7 @@ function render(){
   $('coalitions').innerHTML=coalitions(s).map(x=>`<tr><td>${x.label}</td><td><b class="${x.possible?'yes':'no'}">${x.seats}</b><span class="muted small"> (${x.margin>=0?'+':''}${x.margin})</span></td></tr>`).join('');
   const snapshot=selected==='count'?count:turnout;
   const mirror=snapshot.sourceKind==='third-party-republication';
-  const reporting=mirror?` · שיעור השתתפות ארצי לפי המקור: ${snapshot.nationalTurnoutPct??'—'}% · דיווחי קלפיות עד ${snapshot.observationAsOf||'שעה לא ידועה'}`:'';
+  const reporting=mirror?` · שיעור השתתפות ארצי לפי המקור: ${snapshot.nationalTurnoutPct??'—'}% · נתון ארצי לשעה ${snapshot.nationalTurnoutTime||'לא ידועה'} · עדכון מקור ${snapshot.observationAsOf||'שעה לא ידועה'}`:'';
   $('basis').textContent=`${selected==='count'?'ספירת קולות':'אחוזי הצבעה'} · ${current.matched}/${current.total} יישובים · עדכון הקובץ: ${new Date(snapshot.timestamp).toLocaleString('he-IL',{timeZone:'Asia/Jerusalem'})}${reporting} · ${mirror?'מקור צד שלישי; נתוני אחוזי ההצבעה ביישוב מבוססים על קלפיות מדווחות בלבד ומומרים לבסיס בעלי זכות בחירה של 2022, ולא לספירת מצביעים מאומתת ב־2026.':'מקור ממשלתי או מקור שהוגדר ידנית.'} · אינו מדגם אקראי.`;
   $('feed-source').style.display=mirror?'inline':'none';
 }

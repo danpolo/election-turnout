@@ -37,6 +37,7 @@ export function mirrorToTurnoutSnapshot(feed, historical,now=new Date()){
     type:'turnout',timestamp:time.toISOString(),source:MIRROR_REPO_URL,
     sourceKind:'third-party-republication',
     observationAsOf:feed.turnout?.updated||null,
+    nationalTurnoutTime:feed.turnout?.time||null,
     nationalTurnoutPct:Number.isFinite(Number(feed.turnout?.pct))?Number(feed.turnout.pct):null,
     sourceReportingStations:stations,
     denominatorNote:'2022 historical registered electorate; current 2026 station-sample turnout percent applied to historical denominator',

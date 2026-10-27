@@ -54,6 +54,60 @@ export function modelHistoric(cities, snapshot){
     coverage:observedEligible/Math.max(1,nationalEligible),
     nationalPace,coverageNote:'יישובים שלא דיווחו נכללים לפי קצב ההצבעה הממוצע של היישובים המדווחים'};
 }
+
+/**
+ * Explain (do not alter) the historical-turnout scenario in auditable terms.
+ * A stronghold means >=50% of valid 2022 locality votes went to Arab lists;
+ * this is NOT a demographic classification of residents.
+ * Locality snapshots may cover only reporting polling stations, so summary
+ * turnout must never be represented as an official electorate-wide total.
+ */
+export function turnoutAudit(cities,snapshot,modeled=null){
+  if(!Array.isArray(cities)||!snapshot||!Array.isArray(snapshot.localities))return {ok:false};
+  const byCode=new Map(snapshot.localities.map(x=>[String(x.code??x.cityCode),x]));
+  const group=()=>({localities:0,eligible:0,liveCast:0,previousCast:0});
+  const arabStronghold=group(),others=group();
+  const past={right:0,left:0,arab:0};
+  let seen=0;
+  for(const c of cities){
+    const eligible=safe(c.eligibleVoters),prev=safe(c.totalVotes),valid=safe(c.validVotes);
+    if(eligible<=0||prev<=0||valid<=0)continue;
+    for(const [name,letters] of Object.entries({right:HISTORIC_2022.right,left:HISTORIC_2022.left,arab:HISTORIC_2022.arab}))past[name]+=sum(c.parties,letters);
+    const live=byCode.get(String(c.cityCode));if(!live)continue;
+    const nowEligible=safe(live.eligible??live.eligibleVoters??eligible);
+    const cast=Number(live.voters??live.totalVotes);
+    if(!nowEligible||!Number.isFinite(cast)||cast<0||cast>nowEligible*1.02)continue;
+    // A precinct subset's turnout ratio is an observation, not a locality census.
+    const stronghold=sum(c.parties,HISTORIC_2022.arab)/valid>=0.5;
+    const g=stronghold?arabStronghold:others;
+    g.localities++;g.eligible+=nowEligible;g.liveCast+=cast;g.previousCast+=prev*nowEligible/eligible;seen++;
+  }
+  if(!seen)return {ok:false};
+  const mean=g=>({
+    localities:g.localities,
+    turnout2026Pct:g.eligible?100*g.liveCast/g.eligible:null,
+    turnout2022FinalPct:g.eligible?100*g.previousCast/g.eligible:null,
+    paceVs2022Final:g.previousCast?g.liveCast/g.previousCast:null
+  });
+  const raw=modeled?.ok?modeled:modelHistoric(cities,snapshot);
+  if(!raw.ok)return {ok:false};
+  const baseline=largestRemainder(past,120);
+  const adjusted=largestRemainder({right:raw.stats.right,left:raw.stats.left,arab:raw.stats.arab},120);
+  const totalEligible=arabStronghold.eligible+others.eligible;
+  const observedPct=totalEligible?100*(arabStronghold.liveCast+others.liveCast)/totalEligible:null;
+  const official=Number(snapshot.nationalTurnoutPct);
+  const officialPct=snapshot.nationalTurnoutPct==null||!Number.isFinite(official)||official<0||official>100?null:official;
+  return {
+    ok:true,baselineArabSeats:baseline.arab,adjustedArabSeats:adjusted.arab,
+    pastArabVotes:past.arab,pastClassifiedVotes:past.right+past.left+past.arab,
+    strongholds:mean(arabStronghold),otherLocalities:mean(others),
+    matchedLocalities:seen,
+    observedLocalityTurnoutPct:observedPct,
+    sourceNationalTurnoutPct:officialPct,
+    turnoutGapPp:officialPct!=null&&observedPct!=null?officialPct-observedPct:null
+  };
+}
+
 export function modelCount(cities, snapshot){
   const byCode=new Map(cities.map(c=>[String(c.cityCode),c]));
   const stats={right:0,left:0,arab:0,haredi:0,democrats:0,raam:0,otzmaJoint:0};

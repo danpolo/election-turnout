@@ -12,6 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     steps:
+      - name: Check model's deterministic unit tests
+        shell: bash
+        run: |
+          git clone --depth 1 https://github.com/danpolo/election-turnout.git /tmp/election-app
+          cd /tmp/election-app
+          node --test model.test.mjs live-mirror.test.mjs
       - name: Check public GitHub Pages URL and deployed assets
         shell: bash
         run: |
