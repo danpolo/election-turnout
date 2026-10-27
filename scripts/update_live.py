@@ -186,6 +186,10 @@ def store(kind,rows,stamp,source):
     return True
 
 def run():
+    # Even though GitHub cron cannot specify a year, do not query election
+    # endpoints (or commit anything) on future October 27ths.
+    if datetime.now(ISRAEL).strftime('%Y-%m-%d') != DAY:
+        print('Outside the 2026 election day; no network polling.');return 0
     succeeded=[]
     for url in discover_map():
         try:
