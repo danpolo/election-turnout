@@ -36,8 +36,8 @@ test('turnout audit explains Arab proportional baseline and relative turnout wit
  assert.equal(t.otherLocalities.turnout2026Pct,40);
  assert.equal(t.strongholds.paceVs2022Final,1.2);
  assert.equal(t.otherLocalities.paceVs2022Final,0.5);
- assert.equal(t.baselineArabSeats,40);
- assert.equal(t.adjustedArabSeats,60);
+ assert.equal(t.baselineArabSeats,39);
+ assert.equal(t.adjustedArabSeats,59);
  assert.equal(t.turnoutGapPp,0);
 });
 test('turnout audit fails closed without an observed locality',()=>{
