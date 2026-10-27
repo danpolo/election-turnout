@@ -4,6 +4,11 @@ on:
     paths:
       - '.github/workflows/verify-site.yml'
       - 'index.html'
+      - 'app.mjs'
+      - 'model.mjs'
+      - 'model.test.mjs'
+      - 'live-mirror.mjs'
+      - 'live-mirror.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
